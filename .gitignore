@@ -41,3 +41,4 @@ bin/
 ### Mac OS ###
 .DS_Store
 /.idea/
+/src/main/kotlin/io/github/daniils_loputevs/rsql_runtime_executor/gpt/
