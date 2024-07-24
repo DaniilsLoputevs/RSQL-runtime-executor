@@ -4,44 +4,35 @@ import java.math.BigDecimal
 import java.math.BigInteger
 
 
-sealed interface Token
+typealias AnyToken = Token<*>
 
-open class Expression(val tokens: MutableList<Token> = mutableListOf()) : Token, Iterable<Token> {
-    operator fun plusAssign(token: Token) = Unit.also { tokens.add(token) }
+sealed class Token<CONTENT>(val value: CONTENT) {
 
-    override fun iterator(): Iterator<Token> = tokens.iterator()
+    override fun toString(): String = "${this::class.simpleName}(value=$value})"
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is Token<*>) return false // check hierarchy(is $other a sub-class of Token) as well
+        if (value != other.value) return false
+        return true
+    }
 
-    override fun toString(): String = "${this::class.simpleName}(tokens=$tokens)"
+    override fun hashCode(): Int = value?.hashCode() ?: 0
+
 }
 
-class IndexAccess(tokens: MutableList<Token> = mutableListOf()) : Expression(tokens) {
-    override fun toString(): String = "${this::class.simpleName}(${super.tokens})"
+open class Expression(tokens: MutableList<AnyToken> = mutableListOf()) : Token<MutableList<AnyToken>>(tokens)
+//    , Iterable<Token<*>>
+{
+
+    operator fun plusAssign(token: AnyToken) = Unit.also { value.add(token) }
+//    override fun iterator(): Iterator<Token<*>> = tokens.iterator()
 }
 
-data object TokenThis : Token {
-    override fun toString(): String = "${this::class.simpleName}()"
-}
-
-data object TokenNull : Token {
-    override fun toString(): String = "${this::class.simpleName}()"
-}
-
-class TokenInt(val value: BigInteger) : Token {
-    override fun toString(): String = "${this::class.simpleName}(value=$value)"
-}
-
-class TokenFloat(val value: BigDecimal) : Token {
-    override fun toString(): String = "${this::class.simpleName}(value=$value)"
-}
-
-class TokenBoolean(val value: Boolean) : Token {
-    override fun toString(): String = "${this::class.simpleName}(value=$value)"
-}
-
-class TokenString(val value: String) : Token {
-    override fun toString(): String = "${this::class.simpleName}(value='$value')"
-}
-
-class TokenIdentifier(val value: String) : Token {
-    override fun toString(): String = "${this::class.simpleName}(value='$value')"
-}
+class IndexAccess(tokens: MutableList<AnyToken> = mutableListOf()) : Expression(tokens)
+data object TokenThis : Token<Unit>(Unit)
+data object TokenNull : Token<Unit?>(null)
+class TokenInt(value: BigInteger) : Token<BigInteger>(value)
+class TokenFloat(value: BigDecimal) : Token<BigDecimal>(value)
+class TokenBoolean(value: Boolean) : Token<Boolean>(value)
+class TokenString(value: String) : Token<String>(value)
+class TokenIdentifier(value: String) : Token<String>(value)

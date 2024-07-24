@@ -26,26 +26,33 @@ class SelectorParser {
 
         while (iter.hasNext()) {
             iter.skipWhitespace()
-            val ch = iter.curr
+            val ch = iter.currChar
 
-            // "user.info.extra.counter[user.info.last].start[\"1234\"]"
-            when {
-                ch == '[' -> IndexAccess().let { currExpr += it; stack.addLast(currExpr); currExpr = it; }
-                ch == ']' -> run { currExpr = stack.removeLast(); }
-                ch == ',' -> run {  }
+            try { /* user.info.extra.counter[user.info.last].start["abc"]['collectAttrs'][this].continue */
+                when {
+                    ch == '[' -> IndexAccess().let { currExpr += it; stack.addLast(currExpr); currExpr = it; }
+                    ch == ']' -> run { currExpr = stack.removeLast(); }
+//                    ch == ',' -> run { }
 
-                iter.isThis() -> iter.parseConstThis().also { currExpr += it }
-                iter.isNull() -> iter.parseConstNull().also { currExpr += it }
-                ch.isDigit() -> iter.parseConstNumber().also { currExpr += it }
-                iter.isBoolean() -> iter.parseConstBoolean().also { currExpr += it }
-                iter.isString() -> iter.parseConstString().also { currExpr += it }
-                ch.isLetterOrDigit() -> iter.parseIdentifier().also { currExpr += it }
-                /* continue to parse Identifier, skip dot in the middle of path */
-                ch == '.' -> run { iter.position++; iter.parseIdentifier().also { currExpr += it } }
+                    iter.isThis() -> iter.parseConstThis().also { currExpr += it }
+                    iter.isNull() -> iter.parseConstNull().also { currExpr += it }
+                    ch.isDigit() -> iter.parseConstNumber().also { currExpr += it }
+                    iter.isBoolean() -> iter.parseConstBoolean().also { currExpr += it }
+                    iter.isString() -> iter.parseConstString().also { currExpr += it }
+                    ch.isLetterOrDigit() -> iter.parseIdentifier().also { currExpr += it }
+                    /* continue to parse Identifier, skip dot in the middle of path */
+                    ch == '.' -> run { iter.position++; iter.parseIdentifier().also { currExpr += it } }
 
-                else -> throw IllegalArgumentException("Unexpected character(char='${ch}') at position ${iter.position}")
+                    else -> throw SelectorParseException("Unexpected character(char='${ch}') at position ${iter.position}")
+                }
+                iter.position++
+
+            } catch (e: SelectorParseException) {
+                throw SelectorParseException(
+                    "Exception while selector parsing! iterator state={${iter.stateToString()}}",
+                    e
+                )
             }
-            iter.position++
         }
         return rootExpr
     }

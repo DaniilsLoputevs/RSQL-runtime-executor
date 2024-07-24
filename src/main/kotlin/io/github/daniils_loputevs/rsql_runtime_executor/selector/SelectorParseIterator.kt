@@ -1,7 +1,7 @@
 package org.example.io.github.daniils_loputevs.rsql_runtime_executor.selector
 
 class SelectorParseIterator(val selector: String, var position: Int = 0) : CharIterator() {
-    val curr: Char get() = selector[position]
+    val currChar: Char get() = selector[position]
 
     override fun nextChar(): Char = selector[position++]
     override fun hasNext(): Boolean = position < selector.length
@@ -11,12 +11,15 @@ class SelectorParseIterator(val selector: String, var position: Int = 0) : CharI
         while (position < selector.length && selector[position].isWhitespace()) position++
     }
 
-    override fun toString(): String = "ParseIterator(curr='${currToStr()}', pos=$position, selector='$selector')"
+    override fun toString(): String = "ParseIterator(${stateToString()}"
+
+    fun stateToString() = "curr='${currToStr()}', pos=$position, selector='$selector'"
 
     private fun currToStr() = try {
-        curr.toString()
+        if (position < selector.length) currChar.toString()
+        else "~~End of Selector~~"
     } catch (e: Exception) {
-        "~~Exception on call \$curr~~"
+        "~~Exception on call \$currChar~~"
     }
 
 }
@@ -38,37 +41,40 @@ fun SelectorParseIterator.isString(): Boolean = selector[position].let { ch -> c
 
 
 /** Mutate iterator state */
-fun SelectorParseIterator.parseConstThis(): Token = run { this.position += 4; return TokenThis }
+fun SelectorParseIterator.parseConstThis(): TokenThis = run { this.position += 3; return TokenThis }
 
 /** Mutate iterator state */
-fun SelectorParseIterator.parseConstNull(): Token = run { this.position += 4; return TokenNull }
+fun SelectorParseIterator.parseConstNull(): TokenNull = run { this.position += 3; return TokenNull }
 
 /** Mutate iterator state */
-fun SelectorParseIterator.parseConstNumber(): Token {
+fun SelectorParseIterator.parseConstNumber(): AnyToken {
     val start = position
     while (this.hasNext()) {
-        val ch = curr
-        if (ch.isDigit() || ch == '.') break
-        position++
+        val ch = currChar
+        if (ch.isDigit() || ch == '.')
+            position++
+        else break
     }
+    if (start == position) throw SelectorParseException("expected number constant but find=''")
     val number = selector.substring(start, position)
+    position-- // set position at last char after iteration because next char is other token type
     return if (number.contains('.')) TokenFloat(number.toBigDecimal()) else TokenInt(number.toBigInteger())
 }
 
 /** Mutate iterator state */
-fun SelectorParseIterator.parseConstBoolean(): Token = TokenBoolean(
+fun SelectorParseIterator.parseConstBoolean(): TokenBoolean = TokenBoolean(
     when {
-        selector.startsWith("true", position) -> true
-        selector.startsWith("false", position) -> true
-        else -> throw RuntimeException("unreachable")
+        selector.startsWith("true", position) -> true.also { position += 3 }
+        selector.startsWith("false", position) -> true.also { position += 4 }
+        else -> throw SelectorParseException("Expected boolean but find='${selector.substring(position)}'")
     }
 )
 
 /** Mutate iterator state */
-fun SelectorParseIterator.parseConstString(): Token {
+fun SelectorParseIterator.parseConstString(): TokenString {
     val start = ++position // Skip opening quote
     while (this.hasNext()) {
-        val ch = curr
+        val ch = currChar
         if (ch == '"' || ch == '\'') break
         position++
     }
@@ -78,10 +84,10 @@ fun SelectorParseIterator.parseConstString(): Token {
 }
 
 /** Mutate iterator state */
-fun SelectorParseIterator.parseIdentifier(): Token {
+fun SelectorParseIterator.parseIdentifier(): TokenIdentifier {
     val start = position
     while (this.hasNext()) {
-        val ch = curr
+        val ch = currChar
         if (ch == '.' || ch == '[' || ch == ']') break
         position++
     }
